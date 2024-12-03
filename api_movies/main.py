@@ -1,7 +1,7 @@
 from contextlib import asynccontextmanager
 from typing import Annotated
 
-from fastapi import FastAPI, Query, status
+from fastapi import FastAPI, Query
 from fastapi.responses import JSONResponse
 from sqlmodel import select
 
@@ -25,7 +25,7 @@ app = FastAPI(lifespan=lifespan)
 
 
 # Sanity check
-@app.get("/", status_code=status.HTTP_200_OK)
+@app.get("/", responses={200: {"description": "API is working"}})
 async def read_root():
     """
     Health Check Endpoint
@@ -39,7 +39,14 @@ async def read_root():
 
 
 # Creates a movie
-@app.post("/movie", status_code=status.HTTP_201_CREATED)
+@app.post(
+    "/movie",
+    response_model=Movie,
+    responses={
+        201: {"description": "Movie created", "model": Movie},
+        400: {"description": "Invalid genre"},
+    },
+)
 async def create_movie(session: SessionDep, movie: Movie) -> Movie:
     """
     Movie Creation Endpoint
@@ -55,10 +62,8 @@ async def create_movie(session: SessionDep, movie: Movie) -> Movie:
     Raises:
         400: If the genre is invalid
     """
-    logger.debug(movie)
     if isinstance(movie.genre, str):
         movie.genre = Genre.from_string(movie.genre)
-
     if not movie.genre:
         return JSONResponse(
             status_code=400,
@@ -66,16 +71,18 @@ async def create_movie(session: SessionDep, movie: Movie) -> Movie:
                 "message": f"Invalid genre provided, valid genres are {[g.value for g in Genre]}"
             },
         )
-
     session.add(movie)
     await session.commit()
     await session.refresh(movie)
-    logger.debug(movie)
     return JSONResponse(status_code=201, content=movie.model_dump())
 
 
 # Retrieves all movies, with a max of 100
-@app.get("/movie", status_code=status.HTTP_200_OK)
+@app.get(
+    "/movie",
+    response_model=list[Movie],
+    responses={200: {"description": "Movies retrieved"}},
+)
 async def read_movies(
     session: SessionDep,
     offset: int = 0,
@@ -91,14 +98,20 @@ async def read_movies(
     """
     movies = await session.execute(select(Movie).offset(offset).limit(limit))
     movies = movies.scalars().all()
-    logger.debug(movies)
     return JSONResponse(
         status_code=200, content=[movie.model_dump() for movie in movies]
     )
 
 
 # Retrieves a movie with a given id
-@app.get("/movie/{movie_id}", status_code=status.HTTP_200_OK)
+@app.get(
+    "/movie/{movie_id}",
+    response_model=Movie,
+    responses={
+        200: {"description": "Movie retrieved"},
+        404: {"description": "Movie not found"},
+    },
+)
 async def read_movie(session: SessionDep, movie_id: int) -> Movie:
     """
     Movie ReadOne Endpoint
@@ -115,12 +128,19 @@ async def read_movie(session: SessionDep, movie_id: int) -> Movie:
         404: If the movie is not found
     """
     movie = await session.get(Movie, movie_id)
-    if not movie:
+    if movie is None:
         return JSONResponse(status_code=404, content={"message": "Movie not found"})
     return JSONResponse(status_code=200, content=movie.model_dump())
 
 
-@app.delete("/movie/{movie_id}", status_code=status.HTTP_200_OK)
+@app.delete(
+    "/movie/{movie_id}",
+    response_model=Movie,
+    responses={
+        200: {"description": "Movie deleted"},
+        404: {"description": "Movie not found"},
+    },
+)
 async def delete_movie(session: SessionDep, movie_id: int) -> Movie:
     """
     Movie Delete Endpoint
@@ -137,10 +157,8 @@ async def delete_movie(session: SessionDep, movie_id: int) -> Movie:
         404: If the movie is not found
     """
     movie = await session.get(Movie, movie_id)
-    if not movie:
-        logger.debug("Movie not found")
+    if movie is None:
         return JSONResponse(status_code=404, content={"message": "Movie not found"})
-    logger.debug("Deleting movie")
     await session.delete(movie)
     await session.commit()
     return JSONResponse(status_code=200, content=movie.model_dump())

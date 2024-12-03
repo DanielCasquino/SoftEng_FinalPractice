@@ -1,0 +1,3 @@
+Label,# Samples,Average,Min,Max,Std. Dev.,Error %,Throughput,Received KB/sec,Sent KB/sec,Avg. Bytes
+Delete A Movie,20000,2,1,55,1.26,0.000%,407.98009,87.43,84.64,219.4
+TOTAL,20000,2,1,55,1.26,0.000%,407.98009,87.43,84.64,219.4

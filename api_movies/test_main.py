@@ -65,6 +65,9 @@ def test_read_movie(client):
     assert response.status_code == 200
     assert response.json()["name"] == "TEST_READ_MOVIE"
 
+    response = client.get(f"/movie/{0}")
+    assert response.status_code == 404
+
 
 def test_delete_movie(client):
     movie_data = {
